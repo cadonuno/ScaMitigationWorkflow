@@ -3,13 +3,16 @@ package com.veracode.scamitigation.models;
 import com.veracode.scamitigation.TypeOfSearchEnum;
 import com.veracode.scamitigation.api.VeracodeApi;
 import com.veracode.scamitigation.selenium.SeleniumWrapper;
+
 import java.util.Date;
 import java.util.Iterator;
 import java.util.List;
+
 import org.apache.sling.commons.json.JSONObject;
 import org.openqa.selenium.WebDriver;
 
 public class ScaMitigation {
+    private static final String ACTION_IGNORED = "Action: ignored";
     private final String issueGuid;
     private final String workspace;
     private final String project;
@@ -102,51 +105,49 @@ public class ScaMitigation {
     }
 
     public void populateDateLastIgnore(TypeOfSearchEnum typeOfSearch) {
-        boolean foundRequiredAction = false;
+        this.dateLastIgnore = null;
         Iterator<Comment> iterator = this.comments.iterator();
+        if (typeOfSearch == TypeOfSearchEnum.OPEN_ISSUES
+                || isLastMitigationActionRequiredAction(typeOfSearch, iterator)) {
+            populateDateWithNextAvailableIgnore(iterator);
+        }
+    }
 
-        //TODO: review this
-        do {
-            Comment comment;
-            label36:
-            do {
-                while (iterator.hasNext()) {
-                    comment = iterator.next();
-                    if (typeOfSearch != TypeOfSearchEnum.REJECTED_ISSUES || !this.isMitigationRejection(comment.getText())) {
-                        if (comment.getText().startsWith("Action: ignored")) {
-                            this.dateLastIgnore = comment.getDateCreated();
-                            return;
-                        }
-                        continue label36;
-                    }
-
-                    foundRequiredAction = true;
-                }
-
-                if (!foundRequiredAction) {
-                    this.dateLastIgnore = null;
-                    return;
-                }
-
-                this.dateLastIgnore = (this.comments.get(this.comments.size() - 1)).getDateCreated();
-                return;
-            } while (!this.isMitigationApproval(comment.getText()));
-
-            this.dateLastIgnore = null;
-            if (typeOfSearch != TypeOfSearchEnum.APPROVED_ISSUES) {
-                break;
+    private boolean isLastMitigationActionRequiredAction(TypeOfSearchEnum typeOfSearch, Iterator<Comment> iterator) {
+        Comment comment;
+        while (iterator.hasNext()) {
+            comment = iterator.next();
+            if (typeOfSearch == TypeOfSearchEnum.REJECTED_ISSUES){
+                return this.isMitigationRejection(comment);
             }
-
-            foundRequiredAction = true;
-        } while(typeOfSearch == TypeOfSearchEnum.REJECTED_ISSUES && foundRequiredAction);
+            if (typeOfSearch == TypeOfSearchEnum.APPROVED_ISSUES){
+                return this.isMitigationApproval(comment);
+            }
+        }
+        return false;
     }
 
-    private boolean isMitigationRejection(String commentText) {
-        return this.isSpecificCustomAction(commentText, "Comment: Mitigation Rejected:");
+    private void populateDateWithNextAvailableIgnore(Iterator<Comment> iterator) {
+        Comment comment;
+        while (iterator.hasNext()) {
+            comment = iterator.next();
+            if (isIgnoreAction(comment)) {
+                this.dateLastIgnore = comment.getDateCreated();
+                return;
+            }
+        }
     }
 
-    private boolean isMitigationApproval(String commentText) {
-        return this.isSpecificCustomAction(commentText, "Comment: Mitigation Approved:");
+    private boolean isIgnoreAction(Comment comment) {
+        return comment.getText().startsWith(ACTION_IGNORED);
+    }
+
+    private boolean isMitigationRejection(Comment comment) {
+        return this.isSpecificCustomAction(comment.getText(), "Comment: Mitigation Rejected:");
+    }
+
+    private boolean isMitigationApproval(Comment comment) {
+        return this.isSpecificCustomAction(comment.getText(), "Comment: Mitigation Approved:");
     }
 
     private boolean isSpecificCustomAction(String commentText, String prefix) {

@@ -146,8 +146,8 @@ public final class SeleniumWrapper {
         List<Comment> allComments = new ArrayList<>();
 
         for (int currentIndex = 0; currentIndex < allCommentElements.size() || currentIndex < allDateElements.size(); ++currentIndex) {
-            Date dateCreated = currentIndex < allDateElements.size() ? getDateFromField(((WebElement) allDateElements.get(currentIndex)).getText()) : null;
-            String commentText = currentIndex < allCommentElements.size() ? ((WebElement) allCommentElements.get(currentIndex)).getText() : "";
+            Date dateCreated = currentIndex < allDateElements.size() ? getDateFromField((allDateElements.get(currentIndex)).getText()) : null;
+            String commentText = currentIndex < allCommentElements.size() ? (allCommentElements.get(currentIndex)).getText() : "";
             allComments.add(new Comment(dateCreated, commentText));
         }
 
@@ -204,6 +204,8 @@ public final class SeleniumWrapper {
 
     private static Date getDateFromField(String dateFieldValue) {
         String firstLine = dateFieldValue.split("\\n")[0];
-        return new Date(firstLine.substring(0, firstLine.lastIndexOf(" ") - 2));
+        return firstLine.lastIndexOf(" ") <= 0
+                ? null
+                : new Date(firstLine.substring(0, firstLine.lastIndexOf(" ") - 2));
     }
 }
